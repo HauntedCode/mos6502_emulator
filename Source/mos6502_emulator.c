@@ -37,17 +37,6 @@ typedef enum {
     INDIRECT_INDEXED
 } t_memory_access;
 
-// Enumerated type defining the processor status flags
-typedef enum {
-    CARRY_FLAG,
-    ZERO_FLAG,
-    INTERRUPT_DISABLE,
-    DECIMAL_MODE,
-    BREAK_COMMAND,
-    OVERFLOW_FLAG,
-    NEGATIVE_FLAG
-} t_status_flags;
-
 // -------------------------------------------------------------------------------------------------------------------------------
 // Function Prototypes
 // -------------------------------------------------------------------------------------------------------------------------------
@@ -58,7 +47,9 @@ static unsigned char fetch(unsigned char *, t_registers *);
 static unsigned char read_memory(unsigned char *, t_registers *, unsigned short, t_memory_access);
 
 // Sets the processor status flags
-static void set_processor_status_flags(t_registers *, unsigned char, t_status_flags);
+static void set_zero_page(t_registers *, unsigned char);
+static void set_negative_flag(t_registers *, unsigned char);
+static void set_carry_flag(t_registers *, short);
 
 // -------------------------------------------------------------------------------------------------------------------------------
 // Reset MOS 6502
@@ -127,13 +118,20 @@ extern void execute_mos6502(unsigned char *memory, t_registers *registers) {
     // Execute
     switch (instruction) {
 
+        case ADC_IMMEDIATE: {
+            // Grab immediate value to be added
+            signed char value = fetch(memory, registers);
+            short sum = (short) (value + (signed char) registers->accumulator + (signed char) registers->processor_status.carry_flag);
+
+        } break;
+
         case LDA_IMMEDIATE: {
             // Grab value to be stored
             unsigned char value = fetch(memory, registers);
             registers->accumulator = value;
             // Set processor status register bits
-            set_processor_status_flags(registers, value, NEGATIVE_FLAG);
-            set_processor_status_flags(registers, value, ZERO_FLAG);
+            set_negative_flag(registers, value);
+            set_zero_flag(registers, value);
         } break;
 
         case LDA_ZERO_PAGE: {
@@ -142,8 +140,8 @@ extern void execute_mos6502(unsigned char *memory, t_registers *registers) {
             unsigned char value = read_memory(memory, registers, address, ZERO_PAGE);
             registers->accumulator = value;
             // Set processor status register bits
-            set_processor_status_flags(registers, value, NEGATIVE_FLAG);
-            set_processor_status_flags(registers, value, ZERO_FLAG);
+            set_negative_flag(registers, value);
+            set_zero_flag(registers, value);
         } break;
 
         case LDA_ZERO_PAGE_X: {
@@ -152,8 +150,8 @@ extern void execute_mos6502(unsigned char *memory, t_registers *registers) {
             unsigned char value = read_memory(memory, registers, address, ZERO_PAGE_X);
             registers->accumulator = value;
             // Set processor status register bits
-            set_processor_status_flags(registers, value, NEGATIVE_FLAG);
-            set_processor_status_flags(registers, value, ZERO_FLAG);
+            set_negative_flag(registers, value);
+            set_zero_flag(registers, value);
         } break;
 
         case LDA_ABSOLUTE: {
@@ -165,8 +163,8 @@ extern void execute_mos6502(unsigned char *memory, t_registers *registers) {
             unsigned char value = read_memory(memory, registers, address, ABSOLUTE);
             registers->accumulator = value;
             // Set process status register bits
-            set_processor_status_flags(registers, value, NEGATIVE_FLAG);
-            set_processor_status_flags(registers, value, ZERO_FLAG);
+            set_negative_flag(registers, value);
+            set_zero_flag(registers, value);
         } break;
 
         case LDA_ABSOLUTE_X: {
@@ -178,8 +176,8 @@ extern void execute_mos6502(unsigned char *memory, t_registers *registers) {
             unsigned char value = read_memory(memory, registers, address, ABSOLUTE_X);
             registers->accumulator = value;
             // Set process status register bits
-            set_processor_status_flags(registers, value, NEGATIVE_FLAG);
-            set_processor_status_flags(registers, value, ZERO_FLAG);
+            set_negative_flag(registers, value);
+            set_zero_flag(registers, value);
         } break;
 
         case LDA_ABSOLUTE_Y: {  
@@ -191,8 +189,8 @@ extern void execute_mos6502(unsigned char *memory, t_registers *registers) {
             unsigned char value = read_memory(memory, registers, address, ABSOLUTE_Y);
             registers->accumulator = value;
             // Set process status register bits
-            set_processor_status_flags(registers, value, NEGATIVE_FLAG);
-            set_processor_status_flags(registers, value, ZERO_FLAG);
+            set_negative_flag(registers, value);
+            set_zero_flag(registers, value);
         } break;
         
         case LDA_INDIRECT_X: {
@@ -201,8 +199,8 @@ extern void execute_mos6502(unsigned char *memory, t_registers *registers) {
             unsigned char value = read_memory(memory, registers, address, INDEXED_INDIRECT);
             registers->accumulator = value;
             // Set process status register bits
-            set_processor_status_flags(registers, value, NEGATIVE_FLAG);
-            set_processor_status_flags(registers, value, ZERO_FLAG);
+            set_negative_flag(registers, value);
+            set_zero_flag(registers, value);
         } break;
 
         case LDA_INDIRECT_Y: {
@@ -211,8 +209,8 @@ extern void execute_mos6502(unsigned char *memory, t_registers *registers) {
             unsigned char value = read_memory(memory, registers, address, INDIRECT_INDEXED);
             registers->accumulator = value;
             // Set process status register bits
-            set_processor_status_flags(registers, value, NEGATIVE_FLAG);
-            set_processor_status_flags(registers, value, ZERO_FLAG);
+            set_negative_flag(registers, value);
+            set_zero_flag(registers, value);
         } break;
 
         default:
@@ -289,51 +287,38 @@ static unsigned char read_memory(unsigned char *memory, t_registers *registers, 
 }
 
 // -------------------------------------------------------------------------------------------------------------------------------
-// Sets the Processor Status bits
-//   Inputs: Value, Bits to set
+// Sets the Zero Flag in the Processor Status Register
+//   Inputs Register, Value
 // -------------------------------------------------------------------------------------------------------------------------------
-static void set_processor_status_flags(t_registers *registers, unsigned char value, t_status_flags status_flag) {
-    
-    switch (status_flag) {
-    
-        case CARRY_FLAG: {
+static void set_zero_flag(t_registers *registers, unsigned char value) {
+    if (value == 0) {
+        registers->processor_status.zero_flag = 1;
+    } else {
+        registers->processor_status.zero_flag = 0;
+    }
+}
 
-        } break;
+// -------------------------------------------------------------------------------------------------------------------------------
+// Sets the Negative Flag in the Processor Status Register
+//   Inputs: Registers, Value
+// -------------------------------------------------------------------------------------------------------------------------------
+static void set_negative_flag(t_registers *registers, unsigned char value) {
+    if ((value >> 7) == 1) {
+        registers->processor_status.negative_flag = 1;
+    } else {
+        registers->processor_status.negative_flag = 0;
+    }
+}
 
-        case ZERO_FLAG: {
-            if (value == 0) {
-                registers->processor_status.zero_flag = 1;
-            } else {
-                registers->processor_status.zero_flag = 0;
-            }
-        } break;
-        
-        case INTERRUPT_DISABLE: {
-
-        } break;
-        
-        case DECIMAL_MODE: {
-
-        } break;
-        
-        case BREAK_COMMAND: {
-
-        } break;
-        
-        case OVERFLOW_FLAG: {
-
-        } break;
-        
-        case NEGATIVE_FLAG: {
-            if ((value >> 7) == 1) {
-                registers->processor_status.negative_flag = 1;
-            } else {
-                registers->processor_status.negative_flag = 0;
-            }
-        } break;
-        
-        default: {
-            printf("ERROR: Status flag, %d, does not exist!!", status_flag);
-        }
+// -------------------------------------------------------------------------------------------------------------------------------
+// Sets the Carry Flag in the Processor Status Register
+//   Inputs: Registers, 16 bit version of the arithmetic result
+// -------------------------------------------------------------------------------------------------------------------------------
+static void set_carry_flag(t_registers *registers, short value) {
+    if (value > 127 || value < -128) {
+        // Outside range of signed 8 bit value. Therefore, carry flag needs to be set.
+        registers->processor_status.carry_flag = 1; 
+    } else {
+        registers->processor_status.carry_flag = 0;
     }
 }
